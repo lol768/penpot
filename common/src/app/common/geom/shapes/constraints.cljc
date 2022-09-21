@@ -6,6 +6,7 @@
 
 (ns app.common.geom.shapes.constraints
   (:require
+   [app.common.data :as d]
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes.common :as gco]
@@ -28,6 +29,11 @@
   (if (= :x axis)
     (- (:width tr-rect) (:width rect))
     (- (:height tr-rect) (:height rect))))
+
+(defn get-delta-scale [axis rect tr-rect]
+  (if (= :x axis)
+    (/ (:width tr-rect) (:width rect))
+    (/ (:height tr-rect) (:height rect))))
 
 (defn get-delta-center [axis center tr-center]
   (if (= :x axis)
@@ -63,16 +69,16 @@
   (let [parent-rect (:selrect parent)
         delta-start (get-delta-start axis parent-rect transformed-parent-rect)]
     (if-not (mth/almost-zero? delta-start)
-      {:displacement (get-displacement axis delta-start)}
-      {})))
+      [{:type :move :vector (get-displacement axis delta-start)}]
+      [])))
 
 (defmethod constraint-modifier :end
   [_ axis parent _ _ transformed-parent-rect]
   (let [parent-rect (:selrect parent)
         delta-end (get-delta-end axis parent-rect transformed-parent-rect)]
     (if-not (mth/almost-zero? delta-end)
-      {:displacement (get-displacement axis delta-end)}
-      {})))
+      [{:type :move :vector (get-displacement axis delta-end)}]
+      [])))
 
 (defmethod constraint-modifier :fixed
   [_ axis parent child _ transformed-parent-rect]
@@ -84,11 +90,12 @@
         child-size   (get-size axis child-rect)]
     (if (or (not (mth/almost-zero? delta-start))
             (not (mth/almost-zero? delta-size)))
-
-      {:displacement (get-displacement axis delta-start)
-       :resize-origin (get-displacement axis delta-start (:x child-rect) (:y child-rect))
-       :resize-vector (get-scale axis (/ (+ child-size delta-size) child-size))}
-      {})))
+      [{:type :move
+        :vector (get-displacement axis delta-start)}
+       {:type :resize
+        :origin (get-displacement axis delta-start (:x child-rect) (:y child-rect))
+        :vector (get-scale axis (/ (+ child-size delta-size) child-size))}]
+      [])))
 
 (defmethod constraint-modifier :center
   [_ axis parent _ _ transformed-parent-rect]
@@ -97,32 +104,33 @@
         transformed-parent-center (gco/center-rect transformed-parent-rect)
         delta-center (get-delta-center axis parent-center transformed-parent-center)]
     (if-not (mth/almost-zero? delta-center)
-      {:displacement (get-displacement axis delta-center)}
-      {})))
+      [{:type :move
+        :vector (get-displacement axis delta-center)}]
+      [])))
 
 (defmethod constraint-modifier :scale
-  [_ axis parent _ modifiers transformed-parent-rect]
-  (let [{:keys [resize-vector resize-vector-2 displacement]} modifiers]
-    (let [parent-rect (:selrect parent)
-          delta-start (get-delta-start axis parent-rect transformed-parent-rect)]
-      (cond-> {}
-        (and (some? resize-vector)
-             (not= (axis resize-vector) 1))
-        (assoc :resize-origin (:resize-origin modifiers)
-               :resize-vector (if (= :x axis)
-                                (gpt/point (:x resize-vector) 1)
-                                (gpt/point 1 (:y resize-vector))))
+  [_ axis parent child _ transformed-parent-rect]
+  (let [parent-rect (:selrect parent)
+        delta-start  (get-delta-start axis parent-rect transformed-parent-rect)
+        delta-scale   (get-delta-scale axis parent-rect transformed-parent-rect)]
 
-        (and (= :y axis) (some? resize-vector-2)
-             (not (mth/close? (:y resize-vector-2) 1)))
-        (assoc :resize-origin (:resize-origin-2 modifiers)
-               :resize-vector (gpt/point 1 (:y resize-vector-2)))
+    (if (or (not (mth/almost-zero? delta-start))
+            (not (mth/almost-zero? delta-scale)))
+      [
+       {:type :move
+        :vector (get-displacement axis delta-start)}
 
-        (not (mth/almost-zero? delta-start))
-        (assoc :displacement-after (get-displacement axis delta-start))))))
+       {:type :resize
+        :origin (gpt/point (:x transformed-parent-rect) (:y transformed-parent-rect))
+        :vector (get-scale axis delta-scale)}
+       
+       
+
+       ]
+      [])))
 
 (defmethod constraint-modifier :default [_ _ _ _ _]
-  {})
+  [])
 
 (def const->type+axis
   {:left :start
@@ -150,7 +158,7 @@
       :top
       :scale)))
 
-(defn clean-modifiers
+#_(defn clean-modifiers
   "Remove redundant modifiers"
   [{:keys [displacement resize-vector resize-vector-2] :as modifiers}]
 
@@ -174,60 +182,74 @@
 
 (defn calc-child-modifiers
   [parent child modifiers ignore-constraints transformed-parent-rect]
+  
+  
+  (let [result
+        (if (and (nil? (:resize-vector modifiers))
+                 (nil? (:resize-vector-2 modifiers))
+                 (nil? (:v2 modifiers)))
+          ;; If we don't have a resize modifier we return the same modifiers
+          modifiers
+          (let [constraints-h
+                (if-not ignore-constraints
+                  (:constraints-h child (default-constraints-h child))
+                  :scale)
 
-  (if (and (nil? (:resize-vector modifiers))
-           (nil? (:resize-vector-2 modifiers)))
-    ;; If we don't have a resize modifier we return the same modifiers
-    modifiers
-    (let [constraints-h
-          (if-not ignore-constraints
-            (:constraints-h child (default-constraints-h child))
-            :scale)
+                constraints-v
+                (if-not ignore-constraints
+                  (:constraints-v child (default-constraints-v child))
+                  :scale)
 
-          constraints-v
-          (if-not ignore-constraints
-            (:constraints-v child (default-constraints-v child))
-            :scale)
+                modifiers-h (constraint-modifier (constraints-h const->type+axis) :x parent child modifiers transformed-parent-rect)
+                modifiers-v (constraint-modifier (constraints-v const->type+axis) :y parent child modifiers transformed-parent-rect)]
 
-          modifiers-h (constraint-modifier (constraints-h const->type+axis) :x parent child modifiers transformed-parent-rect)
-          modifiers-v (constraint-modifier (constraints-v const->type+axis) :y parent child modifiers transformed-parent-rect)]
+            {:v2 (d/concat-vec modifiers-h modifiers-v)}
 
-      ;; Build final child modifiers. Apply transform again to the result, to get the
-      ;; real modifiers that need to be applied to the child, including rotation as needed.
-      (cond-> {}
-        ;;(some? (:displacement-after modifiers))
-        ;;(assoc :displacement-after (:displacement-after modifiers))
+            #_(.log js/console (:name child) (clj->js modifiers-h) (clj->js modifiers-v))
+            ;; Build final child modifiers. Apply transform again to the result, to get the
+            ;; real modifiers that need to be applied to the child, including rotation as needed.
+            #_(cond-> {}
+              ;;(some? (:displacement-after modifiers))
+              ;;(assoc :displacement-after (:displacement-after modifiers))
 
-        (or (contains? modifiers-h :displacement-after)
-            (contains? modifiers-v :displacement-after))
-        (assoc :displacement-after (cond-> (gpt/point (get-in modifiers-h [:displacement-after :x] 0)
-                                                       (get-in modifiers-v [:displacement-after :y] 0))
-                                      :always
-                                      (gmt/translate-matrix)))
+              (or (contains? modifiers-h :displacement-after)
+                  (contains? modifiers-v :displacement-after))
+              (assoc :displacement-after (cond-> (gpt/point (get-in modifiers-h [:displacement-after :x] 0)
+                                                            (get-in modifiers-v [:displacement-after :y] 0))
+                                           :always
+                                           (gmt/translate-matrix)))
 
-        (or (contains? modifiers-h :displacement)
-            (contains? modifiers-v :displacement))
-        (assoc :displacement (cond-> (gpt/point (get-in modifiers-h [:displacement :x] 0)
-                                                (get-in modifiers-v [:displacement :y] 0))
-                               (some? (:resize-transform modifiers))
-                               (gpt/transform (:resize-transform modifiers))
+              (or (contains? modifiers-h :displacement)
+                  (contains? modifiers-v :displacement))
+              (assoc :displacement (cond-> (gpt/point (get-in modifiers-h [:displacement :x] 0)
+                                                      (get-in modifiers-v [:displacement :y] 0))
+                                     (some? (:resize-transform modifiers))
+                                     (gpt/transform (:resize-transform modifiers))
 
-                               :always
-                               (gmt/translate-matrix)))
+                                     :always
+                                     (gmt/translate-matrix)))
 
-        (:resize-vector modifiers-h)
-        (assoc :resize-origin (:resize-origin modifiers-h)
-               :resize-vector (gpt/point (get-in modifiers-h [:resize-vector :x] 1)
-                                         (get-in modifiers-h [:resize-vector :y] 1)))
+              (:resize-vector modifiers-h)
+              (assoc :resize-origin (:resize-origin modifiers-h)
+                     :resize-vector (gpt/point (get-in modifiers-h [:resize-vector :x] 1)
+                                               (get-in modifiers-h [:resize-vector :y] 1)))
 
-        (:resize-vector modifiers-v)
-        (assoc :resize-origin-2 (:resize-origin modifiers-v)
-               :resize-vector-2 (gpt/point (get-in modifiers-v [:resize-vector :x] 1)
-                                           (get-in modifiers-v [:resize-vector :y] 1)))
+              (:resize-vector modifiers-v)
+              (assoc :resize-origin-2 (:resize-origin modifiers-v)
+                     :resize-vector-2 (gpt/point (get-in modifiers-v [:resize-vector :x] 1)
+                                                 (get-in modifiers-v [:resize-vector :y] 1)))
 
-        (:resize-transform modifiers)
-        (assoc :resize-transform (:resize-transform modifiers)
-               :resize-transform-inverse (:resize-transform-inverse modifiers))
+              (:resize-transform modifiers)
+              (assoc :resize-transform (:resize-transform modifiers)
+                     :resize-transform-inverse (:resize-transform-inverse modifiers))
 
-        :always
-        (clean-modifiers)))))
+              :always
+              (clean-modifiers))))]
+
+    #_(.log js/console "calc-child-modifiers" (:name parent) (:name child))
+    #_(.log js/console "  >" (clj->js modifiers))
+    #_(.log js/console "  >" (clj->js (select-keys transformed-parent-rect [:x :y :width :height])))
+    #_(.log js/console "  >" (clj->js result))
+
+
+    result))

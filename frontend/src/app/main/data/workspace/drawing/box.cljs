@@ -18,7 +18,8 @@
    [app.main.snap :as snap]
    [app.main.streams :as ms]
    [beicon.core :as rx]
-   [potok.core :as ptk]))
+   [potok.core :as ptk]
+   [app.common.types.modifiers :as ctm]))
 
 (defn truncate-zero [num default]
   (if (mth/almost-zero? num) default num))
@@ -37,9 +38,7 @@
                   scalev)]
     (-> shape
         (assoc :click-draw? false)
-        (assoc-in [:modifiers :resize-vector] scalev)
-        (assoc-in [:modifiers :resize-origin] (gpt/point x y))
-        (assoc-in [:modifiers :resize-rotation] 0))))
+        (ctm/add-resize scalev (gpt/point x y)))))
 
 (defn update-drawing [state point lock?]
   (update-in state [:workspace-drawing :object] resize-shape point lock?))

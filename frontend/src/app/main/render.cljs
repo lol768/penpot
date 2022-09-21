@@ -45,7 +45,9 @@
    [beicon.core :as rx]
    [clojure.set :as set]
    [cuerdas.core :as str]
-   [rumext.alpha :as mf]))
+   [rumext.alpha :as mf]
+   [app.common.types.modifiers :as ctm]
+   ))
 
 (def ^:const viewbox-decimal-precision 3)
 (def ^:private default-color clr/canvas)
@@ -180,13 +182,12 @@
         ;; Replace the previous object with the new one
         objects  (assoc objects object-id object)
 
-        modifier (-> (gpt/point (:x object) (:y object))
-                     (gpt/negate)
-                     (gmt/translate-matrix))
+        vector (-> (gpt/point (:x object) (:y object))
+                   (gpt/negate))
 
         mod-ids  (cons object-id (cph/get-children-ids objects object-id))
         updt-fn  #(-> %1
-                      (assoc-in [%2 :modifiers :displacement] modifier)
+                      (update %2 ctm/add-move vector)
                       (update %2 gsh/transform-shape))]
 
     (reduce updt-fn objects mod-ids)))
@@ -247,23 +248,22 @@
         bounds2 (gsb/get-object-bounds objects (dissoc frame :shadow :blur))
 
         delta-bounds (gpt/point (:x bounds) (:y bounds))
-
-        modifier (gmt/translate-matrix (gpt/negate delta-bounds))
+        vector (gpt/negate delta-bounds)
 
         children-ids
         (cph/get-children-ids objects frame-id)
 
         objects
-        (mf/with-memo [frame-id objects modifier]
-          (let [update-fn #(assoc-in %1 [%2 :modifiers :displacement] modifier)]
+        (mf/with-memo [frame-id objects vector]
+          (let [update-fn #(update-in %1 %2 ctm/add-move vector)]
             (->> children-ids
                  (into [frame-id])
                  (reduce update-fn objects))))
 
         frame
-        (mf/with-memo [modifier]
+        (mf/with-memo [vector]
           (-> frame
-              (assoc-in [:modifiers :displacement] modifier)
+              (ctm/add-move vector)
               (gsh/transform-shape)))
 
         frame
@@ -305,20 +305,19 @@
   (let [group-id (:id group)
         include-metadata? (mf/use-ctx export/include-metadata-ctx)
 
-        modifier
+        vector
         (mf/use-memo
          (mf/deps (:x group) (:y group))
          (fn []
            (-> (gpt/point (:x group) (:y group))
-               (gpt/negate)
-               (gmt/translate-matrix))))
+               (gpt/negate))))
 
         objects
         (mf/use-memo
-         (mf/deps modifier objects group-id)
+         (mf/deps vector objects group-id)
          (fn []
            (let [modifier-ids (cons group-id (cph/get-children-ids objects group-id))
-                 update-fn    #(assoc-in %1 [%2 :modifiers :displacement] modifier)
+                 update-fn    #(update %1 %2 ctm/add-move vector)
                  modifiers    (reduce update-fn {} modifier-ids)]
              (gsh/merge-modifiers objects modifiers))))
 

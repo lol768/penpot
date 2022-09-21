@@ -352,13 +352,20 @@
                       (gpt/subtract (gpt/point child-bounds))
                       (cond-> (some? transform) (gpt/transform transform)))
 
-        modifiers {:displacement-after (gmt/translate-matrix delta-p)}
+        modifiers []
 
         modifiers
         (cond-> modifiers
           (and (col? parent) (= :fill (:layout-h-behavior child)))
-          (assoc :resize-origin (gpt/point child-bounds)
-                 :resize-vector (gpt/point fill-scale 1)))
+          (conj {:type :resize
+                 :from :layout
+                 :origin (gpt/point child-bounds)
+                 :vector (gpt/point fill-scale 1)}))
+
+        modifiers
+        (conj modifiers {:type :move
+                         :from :layout
+                         :vector delta-p})
         ]
 
     [modifiers layout-data]))

@@ -184,6 +184,7 @@
             text? (= type :text)
             transform-text? (and text? (and (nil? (:resize-vector modifiers)) (nil? (:resize-vector-2 modifiers))))]
 
+        ;; TODO: Adapt to new modifiers
         (doseq [node nodes]
           (cond
             ;; Text shapes need special treatment because their resize only change
@@ -260,11 +261,14 @@
              (d/mapm (fn [id {modifiers :modifiers}]
                        (let [shape (get objects id)
                              center (gsh/center-shape shape)
+
+                             ;; TODO Adapt to new modifiers
                              modifiers (cond-> modifiers
                                          ;; For texts we only use the displacement because
                                          ;; resize needs to recalculate the text layout
                                          (= :text (:type shape))
-                                         (select-keys [:displacement :rotation]))]
+                                         (select-keys [:displacement :rotation]))
+                             ]
                          (gsh/modifiers->transform center modifiers)))
                      modifiers))))
 

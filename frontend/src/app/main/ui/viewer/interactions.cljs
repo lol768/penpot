@@ -25,17 +25,18 @@
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.keyboard :as kbd]
    [goog.events :as events]
-   [rumext.alpha :as mf]))
+   [rumext.alpha :as mf]
+   [app.common.types.modifiers :as ctm]
+   ))
 
 (defn prepare-objects
   [frame size objects]
   (let [
         frame-id  (:id frame)
-        modifier  (-> (gpt/point (:x size) (:y size))
-                      (gpt/negate)
-                      (gmt/translate-matrix))
+        vector  (-> (gpt/point (:x size) (:y size))
+                    (gpt/negate))
 
-        update-fn #(d/update-when %1 %2 assoc-in [:modifiers :displacement] modifier)]
+        update-fn #(d/update-when %1 %2 ctm/add-move vector)]
 
     (->> (cph/get-children-ids objects frame-id)
          (into [frame-id])

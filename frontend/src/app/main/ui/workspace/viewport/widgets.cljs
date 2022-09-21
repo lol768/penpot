@@ -213,6 +213,7 @@
                      :y -15
                      :width 100000
                      :height 24
+                     ;; TODO: Remove displacement
                      :transform (str (when (and selected? modifiers)
                                        (str (:displacement modifiers) " " ))
                                      (vwu/text-transform flow-pos zoom))}

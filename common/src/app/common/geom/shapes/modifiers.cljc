@@ -17,39 +17,7 @@
    [app.common.math :as mth]
    [app.common.uuid :as uuid]))
 
-(defn merge-modifiers
-  [modif-tree ids modifiers]
-  (reduce
-   (fn [modif-tree id]
-     (update-in modif-tree [id :modifiers] #(merge % modifiers)))
-   modif-tree
-   ids))
-
-(defn merge-mod2
-  [old-modifiers new-modifiers]
-
-  (let [result
-        (cond-> old-modifiers
-          (not (gtr/empty-modifiers? new-modifiers))
-          (merge old-modifiers new-modifiers)
-
-          (and (some? (:resize-vector old-modifiers))
-               (some? (:resize-vector new-modifiers)))
-          (assoc
-           :resize-origin (:resize-origin old-modifiers)
-           :resize-vector (:resize-vector old-modifiers)
-           :resize-transform (:resize-transform old-modifiers)
-           :resize-transform-inverse (:resize-transform-inverse old-modifiers)
-
-           ;; TODO: Esto puede ser peligroso porque ahora solo se utiliza en el eje-y ¿habria que hacer un resize-3?
-           ;; O cambiar todo por una lista de transformaciones
-           :resize-origin-2 (:resize-origin new-modifiers)
-           :resize-vector-2 (:resize-vector new-modifiers)            
-           )
-          )]
-    result
-    ))
-
+;; TODO: ADAPT TO NEW MODIFIERS
 (defn set-pixel-precision
   "Adjust modifiers so they adjust to the pixel grid"
   [modifiers shape]
@@ -148,7 +116,8 @@
                   result
                   (cond-> modif-tree
                     (not (gtr/empty-modifiers? child-modifiers))
-                    (update-in [(:id child) :modifiers] #(merge-mod2 child-modifiers %))
+                    (update-in [(:id child) :modifiers :v2] #(d/concat-vec % (:v2 child-modifiers)))
+                    #_(update-in [(:id child) :modifiers] #(merge-mod2 child-modifiers %))
                     #_(update-in [(:id child) :modifiers] #(merge child-modifiers %)))
 
                   ;;_ (.log js/console ">>>" (:name child))
@@ -202,8 +171,9 @@
 
                   modif-tree
                   (cond-> modif-tree
-                    (not (gtr/empty-modifiers? modifiers))
-                    (merge-modifiers [(:id child)] modifiers))]
+                    (d/not-empty? modifiers)
+                    (update-in [(:id child) :modifiers :v2] d/concat-vec modifiers)
+                    #_(merge-modifiers [(:id child)] modifiers))]
 
               [layout-data modif-tree]))]
 
@@ -303,6 +273,13 @@
         :else
         (recur (:parent-id current))))))
 
+(defn modif->js
+  [modif-tree objects]
+  (clj->js (into {}
+                 (map (fn [[k v]]
+                        [(get-in objects [k :name]) v]))
+                 modif-tree)))
+
 (defn set-objects-modifiers
   [ids objects get-modifier ignore-constraints snap-pixel?]
 
@@ -334,4 +311,5 @@
 
               modif-tree))]
 
+    (.log js/console ">result" (modif->js modif-tree objects))    
     modif-tree))

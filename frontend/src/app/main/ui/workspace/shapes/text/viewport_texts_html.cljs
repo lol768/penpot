@@ -33,6 +33,7 @@
         (with-meta (meta (:position-data shape))))
       (dissoc :position-data :transform :transform-inverse)))
 
+;; TODO: Adapt to new modifiers
 (defn strip-modifier
   [modifier]
   (if (or (some? (dm/get-in modifier [:modifiers :resize-vector]))

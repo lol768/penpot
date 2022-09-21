@@ -16,7 +16,8 @@
    [app.main.data.workspace.undo :as dwu]
    [app.main.worker :as uw]
    [beicon.core :as rx]
-   [potok.core :as ptk]))
+   [potok.core :as ptk]
+   [app.common.types.modifiers :as ctm]))
 
 (defn clear-drawing
   []
@@ -51,8 +52,7 @@
                    
                    (and click-draw? (not text?))
                    (-> (assoc :width min-side :height min-side)
-                       (assoc-in [:modifiers :displacement]
-                                 (gmt/translate-matrix (- (/ min-side 2)) (- (/ min-side 2)))))
+                       (ctm/add-move (- (/ min-side 2)) (- (/ min-side 2))))
 
                    (and click-draw? text?)
                    (assoc :height 17 :width 4 :grow-type :auto-width)

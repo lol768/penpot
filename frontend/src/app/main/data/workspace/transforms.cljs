@@ -116,6 +116,36 @@
 
 (declare get-ignore-tree)
 
+#_(defn set-modifiers-2
+  [ids modifiers]
+
+  (ptk/reify ::set-modifiers-2
+    ptk/UpdateEvent
+    (update [_ state]
+      (let [objects     (wsh/lookup-page-objects state)
+            ids         (into #{} (remove #(get-in objects [% :blocked] false)) ids)
+
+            ;;snap-pixel? (and (not ignore-snap-pixel)
+            ;;                 (contains? (:workspace-layout state) :snap-pixel-grid))
+
+            ;;modif-tree
+            ;;(gsh/set-objects-modifiers ids objects (constantly modifiers) ignore-constraints snap-pixel?)
+
+            ids
+            (concat ids
+                    (->> ids (mapcat (partial cph/get-children-ids objects))))
+
+            modif-tree
+            (->> ids
+                 (map #(vector % modifiers))
+                 (into {}))
+
+            ]
+
+        (update state :workspace-modifiers-2 merge modif-tree))))
+  
+  )
+
 (defn set-modifiers
   ([ids]
    (set-modifiers ids nil false))
@@ -194,7 +224,7 @@
        (let [objects           (wsh/lookup-page-objects state)
              object-modifiers  (get state :workspace-modifiers)
 
-             ids (keys object-modifiers)
+             ids (or (keys object-modifiers) [])
              ids-with-children (into (vec ids) (mapcat #(cph/get-children-ids objects %)) ids)
 
              shapes            (map (d/getf objects) ids)
@@ -389,6 +419,19 @@
                                  (gmt/translate-matrix displacement))]
 
               (rx/of (set-modifiers ids
+                                    {:v2 [{:type :resize
+                                           :vector scalev
+                                           :origin resize-origin
+                                           :transform shape-transform
+                                           :transform-inverse shape-transform-inverse}]
+                                     ;;:displacement displacement
+                                     ;;:resize-vector scalev
+                                     ;;:resize-origin resize-origin
+                                     ;;:resize-transform shape-transform
+                                     ;;:resize-scale-text scale-text
+                                     ;;:resize-transform-inverse shape-transform-inverse
+                                     }))
+              #_(rx/of (set-modifiers ids
                                     {:displacement displacement
                                      :resize-vector scalev
                                      :resize-origin resize-origin
@@ -655,7 +698,10 @@
                  (rx/with-latest vector snap-delta)
                  ;; We try to use the previous snap so we don't have to wait for the result of the new
                  (rx/map snap/correct-snap-point)
-                 (rx/map #(hash-map :displacement (gmt/translate-matrix %)))
+                 
+                 #_(rx/map #(hash-map :displacement (gmt/translate-matrix %)))
+                 (rx/map #(array-map :v2 [{:type :move :vector %}]))
+
                  (rx/map (partial set-modifiers ids))
                  (rx/take-until stopper))
 
@@ -704,7 +750,8 @@
              (rx/merge
               (->> move-events
                    (rx/scan #(gpt/add %1 mov-vec) (gpt/point 0 0))
-                   (rx/map #(hash-map :displacement (gmt/translate-matrix %)))
+                   #_(rx/map #(hash-map :displacement (gmt/translate-matrix %)))
+                   (rx/map #(hash-map :v2 [:type :move :vector %]))
                    (rx/map (partial set-modifiers selected))
                    (rx/take-until stopper))
               (rx/of (move-selected direction shift?)))
@@ -738,8 +785,10 @@
             delta (gpt/subtract pos cpos)
             displ   (gmt/translate-matrix delta)]
 
-        (rx/of (set-modifiers [id] {:displacement displ} false true)
-               (apply-modifiers [id]))))))
+        (rx/of
+         #_(set-modifiers [id] {:displacement displ} false true)
+         (set-modifiers [id] {:v2 [{:type :move :vector delta}]} false true)
+         (apply-modifiers [id]))))))
 
 (defn- calculate-frame-for-move
   [ids]
@@ -805,7 +854,12 @@
             origin   (gpt/point (:x selrect) (+ (:y selrect) (/ (:height selrect) 2)))]
 
         (rx/of (set-modifiers selected
-                              {:resize-vector (gpt/point -1.0 1.0)
+                              {:v2 [{:type :resize
+                                     :vector (gpt/point -1.0 1.0)
+                                     :origin origin}
+                                    {:type :move
+                                     :vector (gpt/point (:width selrect) 0)}]}
+                              #_{:resize-vector (gpt/point -1.0 1.0)
                                :resize-origin origin
                                :displacement (gmt/translate-matrix (gpt/point (- (:width selrect)) 0))}
                               true)
@@ -822,7 +876,12 @@
             origin   (gpt/point (+ (:x selrect) (/ (:width selrect) 2)) (:y selrect))]
 
         (rx/of (set-modifiers selected
-                              {:resize-vector (gpt/point 1.0 -1.0)
+                              {:v2 [{:type :resize
+                                     :vector (gpt/point 1.0 -1.0)
+                                     :origin origin}
+                                    {:type :move
+                                     :vector (gpt/point 0 (:height selrect))}]}
+                              #_{:resize-vector (gpt/point 1.0 -1.0)
                                :resize-origin origin
                                :displacement (gmt/translate-matrix (gpt/point 0 (- (:height selrect))))}
                               true)
