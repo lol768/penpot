@@ -46,14 +46,15 @@
   (let [go-members    #(st/emit! (dd/go-to-team-members))
         invite-member #(st/emit! (modal/show {:type :invite-members :team team :origin :hero}))]
     [:div.team-hero
-     [:img {:src "images/deco-team-banner.png" :border "0"}]
+     [:img {:src "images/deco-team-banner.png" :border "0"
+            :role "presentation"}]
      [:div.text
       [:div.title (tr "dasboard.team-hero.title")]
       [:div.info
        [:span (tr "dasboard.team-hero.text")]
        [:a {:on-click  go-members} (tr "dasboard.team-hero.management")]]]
      [:button.btn-primary.invite {:on-click invite-member} (tr "onboarding.choice.team-up.invite-members")]
-     [:button.close {:on-click close-banner}
+     [:button.close {:on-click close-banner :alt (tr "labels.close") :aria-label (tr "labels.close")}
       [:span i/close]]]))
 
 (def builtin-templates
@@ -94,7 +95,7 @@
      [:div.text
       [:div.title (tr "dasboard.tutorial-hero.title")]
       [:div.info (tr "dasboard.tutorial-hero.info")]
-      [:button.btn-primary.action {:on-click download-tutorial} 
+      [:button.btn-primary.action {:on-click download-tutorial}
        (case (:status @state)
          :waiting (tr "dasboard.tutorial-hero.start")
          :importing [:span.loader i/loader-pencil]
@@ -102,7 +103,9 @@
          )
        ]]
      [:button.close
-      {:on-click close-tutorial}
+      {:on-click close-tutorial
+       :alt (tr "labels.close")
+       :aria-label (tr "labels.close")}
       [:span.icon i/close]]]))
 
 (mf/defc interface-walkthrough
@@ -121,7 +124,9 @@
       [:a.btn-primary.action {:href " https://design.penpot.app/walkthrough" :target "_blank" :on-click handle-walkthrough-link}
        (tr "dasboard.walkthrough-hero.start")]]
      [:button.close
-      {:on-click close-walkthrough}
+      {:on-click close-walkthrough
+       :alt (tr "labels.close")
+       :aria-label (tr "labels.close")}
       [:span.icon i/close]]]))
 
 (mf/defc project-item
