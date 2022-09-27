@@ -674,24 +674,17 @@
         (apply-transform transform))))
 
 (defn transform-shape
-  [shape]
-  (let [modifiers (:modifiers shape)]
-    (cond
-      (nil? modifiers)
-      shape
+  ([shape]
+   (let [modifiers (:modifiers shape)]
+     (-> shape
+         (dissoc :modifiers)
+         (transform-shape modifiers))))
 
-      (empty-modifiers? modifiers)
-      (dissoc shape :modifiers)
-
-      :else
-      (cond-> shape
-        (not (empty-modifiers? modifiers))
-        (-> (apply-modifiers modifiers)
-            (apply-text-resize modifiers))
-
-        :always
-        (dissoc :modifiers)))))
-
+  ([shape modifiers]
+   (cond-> shape
+     (and (some? modifiers) (not (empty-modifiers? modifiers)))
+     (-> (apply-modifiers modifiers)
+         (apply-text-resize modifiers)))))
 
 (defn transform-bounds-v2
   [points center modifiers]

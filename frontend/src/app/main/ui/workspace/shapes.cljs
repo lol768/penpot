@@ -13,11 +13,13 @@
   common."
   (:require
    [app.main.data.workspace.state-helpers :as wsh]
+   [app.common.geom.shapes :as gsh]
    [app.common.geom.shapes.constraints :as gsc]
    [app.common.geom.point :as gpt]
    [app.main.store :as st]
    [app.common.uuid :as uuid]
    [app.common.geom.shapes.intersect :as gsi]
+   [cuerdas.core :as str]
    
    [app.common.pages.helpers :as cph]
    [app.main.ui.context :as ctx]
@@ -135,11 +137,26 @@
 
          nil))
 
-     [:rect {:x (-> shape :selrect :x)
-             :y (-> shape :selrect :y)
-             :width (-> shape :selrect :width)
-             :height (-> shape :selrect :height)
-             :style {:fill "none" :stroke "red" :stroke-width 1}}]
+     (let [objects (wsh/lookup-page-objects @st/state)
+           parent (get objects (:parent-id shape))
+           child shape
+
+           points
+           (-> child
+               :points
+               (gsh/transform-points (:transform-inverse parent))
+               (gsh/points->rect)
+               (gsh/rect->points) ;; Restore to points so we can transform them
+               (gsh/transform-points (:transform parent)))]
+
+       
+       [:polyline {:points (->> (concat points [(nth points 0)]) (map #(str (:x %) "," (:y %))) (str/join " "))
+                   :style {:fill "none" :stroke "red" :stroke-width 1}}]
+       #_[:rect {:x (-> rect-before :x)
+               :y (-> rect-before :y)
+               :width (-> rect-before :width)
+               :height (-> rect-before :height)
+               :style {:fill "none" :stroke "red" :stroke-width 1}}])
 
      (when (and (some? (:parent-id shape)) (not= uuid/zero (:parent-id shape)))
        (let [objects (wsh/lookup-page-objects @st/state)
@@ -147,16 +164,18 @@
 
              child shape
              
+             parent-points-before (:points parent)
+             child-points-before (gsc/bounding-box-parent-transform child parent)
 
-             [p0 p1 p2 p3] (-> child :points)
+             [p0 p1 p2 p3] child-points-before
 
-             r (gsc/right-vector child parent)
-             l (gsc/left-vector child parent)
-             t (gsc/top-vector child parent)
-             b (gsc/bottom-vector child parent)
+             r (gsc/right-vector child-points-before parent-points-before)
+             l (gsc/left-vector child-points-before parent-points-before)
+             t (gsc/top-vector child-points-before parent-points-before)
+             b (gsc/bottom-vector child-points-before parent-points-before)
 
-             c1 (gsc/center-horizontal-vector child parent)
-             c2 (gsc/center-vertical-vector child parent)
+             c1 (gsc/center-horizontal-vector child-points-before parent-points-before)
+             c2 (gsc/center-vertical-vector child-points-before parent-points-before)
 
 
              pt (gpt/add p0 t)
@@ -210,6 +229,11 @@
            [:circle {:r 5
                      :cx (:x pr)
                      :cy (:y pr)
+                     :style {:stroke "blue"}}]
+
+           [:circle {:r 5
+                     :cx (:x p1)
+                     :cy (:y p1)
                      :style {:stroke "blue"}}]
            
            [:line {:x1 (:x p1)
