@@ -488,13 +488,13 @@
         rotation (-> (gmt/matrix)
                      (gmt/rotate angle center)
                      (gmt/rotate (- angle) shape-center))]
+
     {:v2 [{:type :rotation
            :center shape-center
            :rotation angle}
 
-          {:type :transform
-           :transform rotation}
-          ]}
+          {:type :move
+           :vector (gpt/transform (gpt/point 1 1) rotation)}]}
     #_{:rotation angle
      :displacement displacement}))
 
@@ -514,13 +514,13 @@
 
   ([center modifiers]
 
-   (letfn [(apply-modifier [matrix {:keys [type vector rotation center origin vector transform transform-inverse]}]
+   (letfn [(apply-modifier [matrix {:keys [type vector rotation center origin vector transform transform-inverse] :as modifier}]
              (case type
                :move
                (gmt/multiply (gmt/translate-matrix vector) matrix)
 
-               :transform
-               (gmt/multiply transform matrix)
+               ;;:transform
+               ;;(gmt/multiply transform matrix)
 
                :resize
                (gmt/multiply
@@ -695,8 +695,13 @@
 
 (defn transform-bounds-v2
   [points center modifiers]
+  (let [transform (modifiers->transform center {:v2 modifiers})
+        result (gco/transform-points points center transform)]
 
-  (letfn [(apply-modifier [points {:keys [type vector origin]}]
+    ;;(.log js/console "??" (str transform) (clj->js result))
+    result)
+  
+  #_(letfn [(apply-modifier [points {:keys [type vector origin]}]
             (case type
               :move
               (let [displacement (gmt/translate-matrix vector)]

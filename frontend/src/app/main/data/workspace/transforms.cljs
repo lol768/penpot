@@ -185,8 +185,8 @@
              ids
              (->> shapes
                   (remove #(get % :blocked false))
-                  (mapcat #(cph/get-children objects (:id %)))
-                  (concat shapes)
+                  #_(mapcat #(cph/get-children objects (:id %)))
+                  #_(concat shapes)
                   (filter #((cpc/editable-attrs (:type %)) :rotation))
                   (map :id))
 

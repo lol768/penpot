@@ -12,6 +12,13 @@
   others are defined using a generic wrapper implemented in
   common."
   (:require
+   [app.main.data.workspace.state-helpers :as wsh]
+   [app.common.geom.shapes.constraints :as gsc]
+   [app.common.geom.point :as gpt]
+   [app.main.store :as st]
+   [app.common.uuid :as uuid]
+   [app.common.geom.shapes.intersect :as gsi]
+   
    [app.common.pages.helpers :as cph]
    [app.main.ui.context :as ctx]
    [app.main.ui.shapes.circle :as circle]
@@ -64,24 +71,37 @@
        [:& ff/fontfaces-style {:shapes (into [] xform shapes)}])
 
      (for [shape shapes]
-       (cond
-         (not (cph/frame-shape? shape))
-         [:& shape-wrapper
-          {:shape shape
-           :key (:id shape)}]
+       [:*
+        
+        
+        (cond
+          (not (cph/frame-shape? shape))
+          [:& shape-wrapper
+           {:shape shape
+            :key (:id shape)}]
 
-         (cph/root-frame? shape)
-         [:& root-frame-wrapper
-          {:shape shape
-           :key (:id shape)
-           :objects (get frame-objects (:id shape))
-           :thumbnail? (not (contains? active-frames (:id shape)))}]
+          (cph/root-frame? shape)
+          [:& root-frame-wrapper
+           {:shape shape
+            :key (:id shape)
+            :objects (get frame-objects (:id shape))
+            :thumbnail? (not (contains? active-frames (:id shape)))}]
 
-         :else
-         [:& nested-frame-wrapper
-          {:shape shape
-           :key (:id shape)
-           :objects (get frame-objects (:id shape))}]))]))
+          :else
+          [:& nested-frame-wrapper
+           {:shape shape
+            :key (:id shape)
+            :objects (get frame-objects (:id shape))}])
+
+        [:rect {:x (-> shape :selrect :x)
+                :y (-> shape :selrect :y)
+                :width (-> shape :selrect :width)
+                :height (-> shape :selrect :height)
+                :style {:fill "none" :stroke "red" :stroke-width 1}}]
+
+        
+
+        ])]))
 
 (mf/defc shape-wrapper
   {::mf/wrap [#(mf/memo' % (mf/check-props ["shape"]))]
@@ -97,21 +117,138 @@
              (not (contains? active-frames (:id shape))))
 
         opts  #js {:shape shape :thumbnail? thumbnail?}]
-    (when (and (some? shape) (not (:hidden shape)))
-      (case (:type shape)
-        :path    [:> path/path-wrapper opts]
-        :text    [:> text/text-wrapper opts]
-        :group   [:> group-wrapper opts]
-        :rect    [:> rect-wrapper opts]
-        :image   [:> image-wrapper opts]
-        :circle  [:> circle-wrapper opts]
-        :svg-raw [:> svg-raw-wrapper opts]
-        :bool    [:> bool-wrapper opts]
+    [:*
+     
+     (when (and (some? shape) (not (:hidden shape)))
+       (case (:type shape)
+         :path    [:> path/path-wrapper opts]
+         :text    [:> text/text-wrapper opts]
+         :group   [:> group-wrapper opts]
+         :rect    [:> rect-wrapper opts]
+         :image   [:> image-wrapper opts]
+         :circle  [:> circle-wrapper opts]
+         :svg-raw [:> svg-raw-wrapper opts]
+         :bool    [:> bool-wrapper opts]
 
-        ;; Only used when drawing a new frame.
-        :frame [:> nested-frame-wrapper opts]
+         ;; Only used when drawing a new frame.
+         :frame [:> nested-frame-wrapper opts]
 
-        nil))))
+         nil))
+
+     [:rect {:x (-> shape :selrect :x)
+             :y (-> shape :selrect :y)
+             :width (-> shape :selrect :width)
+             :height (-> shape :selrect :height)
+             :style {:fill "none" :stroke "red" :stroke-width 1}}]
+
+     (when (and (some? (:parent-id shape)) (not= uuid/zero (:parent-id shape)))
+       (let [objects (wsh/lookup-page-objects @st/state)
+             parent (get objects (:parent-id shape))
+
+             child shape
+             
+
+             [p0 p1 p2 p3] (-> child :points)
+
+             r (gsc/right-vector child parent)
+             l (gsc/left-vector child parent)
+             t (gsc/top-vector child parent)
+             b (gsc/bottom-vector child parent)
+
+             c1 (gsc/center-horizontal-vector child parent)
+             c2 (gsc/center-vertical-vector child parent)
+
+
+             pt (gpt/add p0 t)
+             pr (gpt/add p1 r)
+             pb (gpt/add p2 b)
+             pl (gpt/add p3 l)
+
+             pc1 (gpt/add p1 c1)
+             pc2 (gpt/add p1 c2) 
+             ]
+
+         [:*
+
+          [:g
+           [:circle {:r 5
+                     :cx (:x pc1)
+                     :cy (:y pc1)
+                     :style {:stroke "green"}}]
+           
+           [:line {:x1 (:x p1)
+                   :y1 (:y p1)
+                   :x2 (:x pc1)
+                   :y2 (:y pc1)
+                   :style {:stroke "green"}}]]
+
+          [:g
+           [:circle {:r 5
+                     :cx (:x pc2)
+                     :cy (:y pc2)
+                     :style {:stroke "green"}}]
+           
+           [:line {:x1 (:x p1)
+                   :y1 (:y p1)
+                   :x2 (:x pc2)
+                   :y2 (:y pc2)
+                   :style {:stroke "green"}}]]
+
+          [:g
+           [:circle {:r 5
+                     :cx (:x pt)
+                     :cy (:y pt)
+                     :style {:stroke "blue"}}]
+           
+           [:line {:x1 (:x p0)
+                   :y1 (:y p0)
+                   :x2 (:x pt)
+                   :y2 (:y pt)
+                   :style {:stroke "blue"}}]]
+
+          [:g
+           [:circle {:r 5
+                     :cx (:x pr)
+                     :cy (:y pr)
+                     :style {:stroke "blue"}}]
+           
+           [:line {:x1 (:x p1)
+                   :y1 (:y p1)
+                   :x2 (:x pr)
+                   :y2 (:y pr)
+                   :style {:stroke "blue"}}]]
+
+          [:g
+           [:circle {:r 5
+                     :cx (:x pb)
+                     :cy (:y pb)
+                     :style {:stroke "blue"}}]
+           
+           [:line {:x1 (:x p2)
+                   :y1 (:y p2)
+                   :x2 (:x pb)
+                   :y2 (:y pb)
+                   :style {:stroke "blue"}}]]
+
+          [:g
+           [:circle {:r 5
+                     :cx (:x pl)
+                     :cy (:y pl)
+                     :style {:stroke "blue"}}]
+           
+           [:line {:x1 (:x p3)
+                   :y1 (:y p3)
+                   :x2 (:x pl)
+                   :y2 (:y pl)
+                   :style {:stroke "blue"}}]]
+
+          
+          
+          
+          
+
+          ]))
+     ]))
 
 (def group-wrapper (group/group-wrapper-factory shape-wrapper))
 (def svg-raw-wrapper (svg-raw/svg-raw-wrapper-factory shape-wrapper))

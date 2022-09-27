@@ -107,10 +107,13 @@
 
 (defn set-children-modifiers
   [modif-tree objects shape ignore-constraints snap-pixel?]
-  (letfn [(set-child [transformed-rect snap-pixel? modif-tree child]
+  (letfn [(set-child [transformed-parent snap-pixel? modif-tree child]
             (let [modifiers (get-in modif-tree [(:id shape) :modifiers])
 
-                  child-modifiers (gct/calc-child-modifiers shape child modifiers ignore-constraints transformed-rect)
+                  child-modifiers (gct/calc-child-modifiers shape child modifiers ignore-constraints transformed-parent)
+
+                  ;;_ (.log js/console (:name child) (clj->js child-modifiers))
+
                   ;;child-modifiers (cond-> child-modifiers snap-pixel? (set-pixel-precision child))
 
                   result
@@ -130,9 +133,12 @@
           ]
     (let [children (map (d/getf objects) (:shapes shape))
           modifiers (get-in modif-tree [(:id shape) :modifiers])
-          transformed-rect (gtr/transform-selrect (:selrect shape) modifiers)
+          ;; transformed-rect (gtr/transform-selrect (:selrect shape) modifiers)
+          ;; transformed-rect (-> shape (merge {:modifiers modifiers}) gtr/transform-shape :selrect)
+          transformed-parent (-> shape (merge {:modifiers modifiers}) gtr/transform-shape)
+          
           resize-modif? (or (:resize-vector modifiers) (:resize-vector-2 modifiers))]
-      (reduce (partial set-child transformed-rect (and snap-pixel? resize-modif?)) modif-tree children))))
+      (reduce (partial set-child transformed-parent (and snap-pixel? resize-modif?)) modif-tree children))))
 
 (defn group? [shape]
   (or (= :group (:type shape))
@@ -273,7 +279,7 @@
         :else
         (recur (:parent-id current))))))
 
-(defn modif->js
+#_(defn modif->js
   [modif-tree objects]
   (clj->js (into {}
                  (map (fn [[k v]]
@@ -311,5 +317,5 @@
 
               modif-tree))]
 
-    (.log js/console ">result" (modif->js modif-tree objects))    
+    ;;(.log js/console ">result" (modif->js modif-tree objects))    
     modif-tree))

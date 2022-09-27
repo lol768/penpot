@@ -65,7 +65,8 @@
         render-id (mf/use-ctx muc/render-id)]
 
     [:*
-     [:g {:clip-path (when (not show-content) (frame-clip-url shape render-id))}
+     [:g {;;:clip-path (when (not show-content) (frame-clip-url shape render-id))
+          }
       (when (not show-content)
         [:& frame-clip-def {:shape shape :render-id render-id}])
 
