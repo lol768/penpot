@@ -24,6 +24,7 @@
 - Fix Terms and Privacy links overlapping [Taiga #4137](https://tree.taiga.io/project/penpot/issue/4137)
 - Fix Cannot take out an element from a group at layers panel by drag [Taiga #4209](https://tree.taiga.io/project/penpot/issue/4209)
 - Fix Internal error when resending invitation email [Taiga #4212](https://tree.taiga.io/project/penpot/issue/4212)
+- Fix some typos [Taiga #4215](https://tree.taiga.io/project/penpot/issue/4215)
 
 ## 1.15.3-beta
 
